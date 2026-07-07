@@ -460,6 +460,41 @@ def plot_confusion_matrices(y_test, y_pred_list, model_names, label_encoder):
     print("Saved: graphs/confusion_matrices.png")
     plt.close()
 
+def save_results_to_csv(results_df, filename='model_results.csv'):
+    """Save results to CSV with error handling"""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Close any file handles that might be open
+            import gc
+            gc.collect()
+            time.sleep(1)
+            
+            # Try to remove old file if it exists
+            if os.path.exists(filename):
+                try:
+                    os.remove(filename)
+                    print(f"Removed old {filename}")
+                except:
+                    pass
+            
+            # Save to CSV
+            results_df.to_csv(filename, index=False)
+            print(f"✓ Successfully saved: {filename}")
+            return True
+            
+        except PermissionError as e:
+            print(f"Attempt {attempt+1}/{max_retries}: Permission denied. Retrying...")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            else:
+                print(f"ERROR: Could not save {filename} after {max_retries} attempts")
+                print("Make sure the file is not open in Excel or another program")
+                return False
+        except Exception as e:
+            print(f"Error saving CSV: {e}")
+            return False
+
 def main():
     print("Starting Improved Deep Learning Model Training Pipeline...")
     print("="*60)
@@ -522,22 +557,28 @@ def main():
     y_pred_list.append(nn_pred)
     y_pred_proba_list.append(nn_proba)
     
-    # Save results to CSV
+    # Save results to CSV with error handling
     print("\n" + "="*60)
     print("Saving results to CSV...")
     results_df = pd.DataFrame(results_list)
-    results_df.to_csv('model_results.csv', index=False)
-    print("Saved: model_results.csv")
-    print("\nResults Summary:")
-    print(results_df.to_string(index=False))
+    
+    if save_results_to_csv(results_df, 'model_results.csv'):
+        print("\nResults Summary:")
+        print(results_df.to_string(index=False))
+    else:
+        print("\nFailed to save CSV. Results summary:")
+        print(results_df.to_string(index=False))
     
     # Generate graphs
     print("\n" + "="*60)
     print("Generating graphs...")
     
-    plot_accuracy_comparison(results_list)
-    plot_auc_curves(y_test, y_pred_proba_list, model_names, num_classes)
-    plot_confusion_matrices(y_test, y_pred_list, model_names, label_encoder)
+    try:
+        plot_accuracy_comparison(results_list)
+        plot_auc_curves(y_test, y_pred_proba_list, model_names, num_classes)
+        plot_confusion_matrices(y_test, y_pred_list, model_names, label_encoder)
+    except Exception as e:
+        print(f"Error generating graphs: {e}")
     
     print("\n" + "="*60)
     print("Pipeline completed successfully!")
